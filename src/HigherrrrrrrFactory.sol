@@ -2,11 +2,17 @@
 pragma solidity ^0.8.23;
 
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeTransferLib} from "solady/src/utils/SafeTransferLib.sol";
+import {FixedPointMathLib} from "solady/src/utils/FixedPointMathLib.sol";
 import {Higherrrrrrr} from "./Higherrrrrrr.sol";
 import {IHigherrrrrrr} from "./interfaces/IHigherrrrrrr.sol";
 import {IHigherrrrrrrConviction} from "./interfaces/IHigherrrrrrrConviction.sol";
 
 contract HigherrrrrrrFactory {
+    using SafeTransferLib for address;
+    using FixedPointMathLib for uint256;
+
     error Unauthorized();
     error ZeroAddress();
 
@@ -49,63 +55,63 @@ contract HigherrrrrrrFactory {
     }
 
     function createHigherrrrrrr(
-        string calldata name,
-        string calldata symbol,
-        string calldata uri,
+        string calldata _name,
+        string calldata _symbol,
+        string calldata _baseTokenURI,
         IHigherrrrrrr.TokenType _tokenType,
-        IHigherrrrrrr.PriceLevel[] calldata levels
+        IHigherrrrrrr.PriceLevel[] calldata _priceLevels,
+        address _creatorFeeRecipient
     ) external payable returns (address token, address conviction) {
         bytes32 salt = keccak256(abi.encodePacked(token, block.timestamp));
 
-        // Clone the Conviction NFT implementation
+        // ==== Effects ====================================================
         conviction = Clones.cloneDeterministic(convictionImplementation, salt);
-        // Deploy token
         token = Clones.cloneDeterministic(tokenImplementation, salt);
-
-        IHigherrrrrrr(token).initialize{value: msg.value}(
-            feeRecipient,
+        IHigherrrrrrr(token).initialize(
+            /// Constants from Factory
             weth,
+            bondingCurve,
+            conviction,
             nonfungiblePositionManager,
             swapRouter,
-            bondingCurve,
+            /// ERC20
+            _name,
+            _symbol,
+            /// Evolution
             _tokenType,
-            uri,
-            name,
-            symbol,
-            levels,
-            conviction
+            _baseTokenURI,
+            _priceLevels,
+            /// Fees
+            feeRecipient,
+            _creatorFeeRecipient
         );
-
-        // Initialize the Conviction NFT clone
-        IHigherrrrrrrConviction(conviction).initialize(token);
 
         tokens.push(token);
         emit NewToken(token, conviction);
-    }
 
-    function getTokensWithETHFeesAboveThreshold(uint128 threshold) public view returns (address[] memory) {
-        address[] memory tokensToCollect = new address[](tokens.length);
-        address token;
-        for (uint256 i = 0; i < tokens.length; i++) {
-            token = tokens[i];
-            (uint128 ethOwed,) = IHigherrrrrrr(token).availableFees();
-            if (ethOwed >= threshold) {
-                tokensToCollect[i] = token;
-            }
-        }
-        return tokensToCollect;
-    }
-
-    function collectFees(address[] memory tokensToCollect) public {
-        address token;
-        for (uint256 i = 0; i < tokensToCollect.length; i++) {
-            token = tokensToCollect[i];
-            if (token == address(0)) continue;
-            IHigherrrrrrr(token).collectFees();
+        if (msg.value > 0) {
+            token.safeTransferETH(msg.value);
         }
     }
 
     function collectAllFees() external {
-        collectFees(tokens);
+        uint256 tokenCount = tokens.length;
+        for (uint256 i = 0; i < tokenCount;) {
+            IHigherrrrrrr(tokens[i]).collect();
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function collectFees(address[] calldata _tokens) public {
+        uint256 tokenCount = _tokens.length;
+
+        for (uint256 i = 0; i < tokenCount;) {
+            IHigherrrrrrr(_tokens[i]).collect();
+            unchecked {
+                ++i;
+            }
+        }
     }
 }

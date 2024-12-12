@@ -2,8 +2,11 @@
 pragma solidity ^0.8.23;
 
 interface IHigherrrrrrr {
+    /// @notice Unauthorized
+    error Unauthorized();
+
     /// @notice Thrown when an operation is attempted with a zero address
-    error AddressZero();
+    error AddressZero(string variable);
 
     /// @notice Thrown when an invalid market type is specified
     error InvalidMarketType();
@@ -140,7 +143,7 @@ interface IHigherrrrrrr {
     /// @notice Emitted when fees are distributed
     /// @param feeRecipient The address of the fee recipient
     /// @param fee The fee amount
-    event HigherrrrrrTokenFees(address indexed feeRecipient, uint256 fee);
+    event HigherrrrrrTokenFees(address indexed feeRecipient, address token, uint256 fee);
 
     /// @notice Emitted when a market graduates
     /// @param tokenAddress The address of the token
@@ -233,39 +236,92 @@ interface IHigherrrrrrr {
     /// @return currentLevel The current price level
     function getCurrentPriceLevel() external view returns (uint256 currentPrice, PriceLevel memory currentLevel);
 
-    /// @notice Returns the available fees for the position
-    /// @return tokensOwed0 The number of WETH tokens owed to the position
-    /// @return tokensOwed1 The number of tokens owed to the position
-    function availableFees() external view returns (uint128, uint128);
-
-    /// @notice Collects fees from the position
-    /// @return amount0 The number of token0 collected
-    /// @return amount1 The number of token1 collected
-    function collectFees() external returns (uint256, uint256);
-
     /// @notice Initializes a new Higherrrrrrr token
-    /// @param _feeRecipient The address to receive fees
     /// @param _weth The WETH token address
+    /// @param _bondingCurve The address of the bonding curve module
+    /// @param _convictionNFT The address of the conviction NFT contract
     /// @param _nonfungiblePositionManager The Uniswap V3 position manager address
     /// @param _swapRouter The Uniswap V3 router address
-    /// @param _bondingCurve The address of the bonding curve module
-    /// @param _tokenType The type of token (REGULAR or TEXT_EVOLUTION)
-    /// @param _tokenURI The basic token URI for the Conviction NFT
     /// @param _name The token name
     /// @param _symbol The token symbol
+    /// @param _tokenType The type of token (REGULAR or TEXT_EVOLUTION)
+    /// @param _tokenURI The basic token URI for the Conviction NFT
     /// @param _priceLevels The price levels and names
-    /// @param _convictionNFT The address of the conviction NFT contract
+    /// @param _protocolFeeRecipient The address to receive fees
+    /// @param _creatorFeeRecipient The address of the creator
     function initialize(
-        address _feeRecipient,
+        /// @dev Constants from Factory
         address _weth,
+        address _bondingCurve,
+        address _convictionNFT,
         address _nonfungiblePositionManager,
         address _swapRouter,
-        address _bondingCurve,
-        TokenType _tokenType,
-        string memory _tokenURI,
+        /// @dev ERC20
         string memory _name,
         string memory _symbol,
+        /// @dev Evolution
+        TokenType _tokenType,
+        string memory _tokenURI,
         PriceLevel[] calldata _priceLevels,
-        address _convictionNFT
-    ) external payable;
+        // @dev Fees
+        address _protocolFeeRecipient,
+        address _creatorFeeRecipient
+    ) external;
+
+    /// @notice Returns the total collectable fees from both trading and liquidity
+    /// @return protocolETH The amount of ETH collectable by the protocol
+    /// @return creatorETH The amount of ETH collectable by the creator
+    /// @return protocolTokens The amount of tokens collectable by the protocol
+    /// @return creatorTokens The amount of tokens collectable by the creator
+    function collectable()
+        external
+        view
+        returns (uint256 protocolETH, uint256 creatorETH, uint256 protocolTokens, uint256 creatorTokens);
+
+    /// @notice Returns the collectable fees from liquidity provision
+    /// @return protocolETH The amount of ETH collectable by the protocol
+    /// @return creatorETH The amount of ETH collectable by the creator
+    /// @return protocolTokens The amount of tokens collectable by the protocol
+    /// @return creatorTokens The amount of tokens collectable by the creator
+    function collectableLiquidityFees()
+        external
+        view
+        returns (uint256 protocolETH, uint256 creatorETH, uint256 protocolTokens, uint256 creatorTokens);
+
+    /// @notice Returns the collectable fees from trading
+    /// @return protocolETH The amount of ETH collectable by the protocol
+    /// @return creatorETH The amount of ETH collectable by the creator
+    /// @return protocolTokens The amount of tokens collectable by the protocol
+    /// @return creatorTokens The amount of tokens collectable by the creator
+    function collectableTradingFees()
+        external
+        view
+        returns (uint256 protocolETH, uint256 creatorETH, uint256 protocolTokens, uint256 creatorTokens);
+
+    /// @notice Collects all fees from both trading and liquidity
+    /// @return protocolETH The amount of ETH collected by the protocol
+    /// @return creatorETH The amount of ETH collected by the creator
+    /// @return protocolTokens The amount of tokens collected by the protocol
+    /// @return creatorTokens The amount of tokens collected by the creator
+    function collect()
+        external
+        returns (uint256 protocolETH, uint256 creatorETH, uint256 protocolTokens, uint256 creatorTokens);
+
+    /// @notice Collects fees from trading only
+    /// @return protocolETH The amount of ETH collected by the protocol
+    /// @return creatorETH The amount of ETH collected by the creator
+    /// @return protocolTokens The amount of tokens collected by the protocol
+    /// @return creatorTokens The amount of tokens collected by the creator
+    function collectTradingFees()
+        external
+        returns (uint256 protocolETH, uint256 creatorETH, uint256 protocolTokens, uint256 creatorTokens);
+
+    /// @notice Collects fees from liquidity provision only
+    /// @return protocolETH The amount of ETH collected by the protocol
+    /// @return creatorETH The amount of ETH collected by the creator
+    /// @return protocolTokens The amount of tokens collected by the protocol
+    /// @return creatorTokens The amount of tokens collected by the creator
+    function collectLiquidityFees()
+        external
+        returns (uint256 protocolETH, uint256 creatorETH, uint256 protocolTokens, uint256 creatorTokens);
 }
